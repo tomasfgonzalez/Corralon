@@ -1,0 +1,11 @@
+Security on the DB : 
+I did 
+-- Enable RLS if not already enabled
+alter table public.products enable row level security;
+
+-- Allow anyone to insert, update, or delete
+create policy "Allow public writes" on public.products
+for all
+to public
+using (true)
+with check (true);
