@@ -1,72 +1,66 @@
 // File: src/pages/admin/AdminOrders.js
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../supabaseClient';
+import {
+  fetchOrders,
+  markOrderAsSent,
+  cancelOrder,
+  deleteOrder
+} from '../../usecases/adminUseCases';
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
+  const loadOrders = async () => {
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      const data = await fetchOrders();
+      setOrders(data);
+    } catch (err) {
+      console.error(err);
+      setErrorMsg(err.message || 'Error desconocido');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('*') // Start simple; we can add order_items later
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        setOrders(data || []);
-      } catch (err) {
-        console.error('Error fetching orders:', err);
-        setErrorMsg(err.message || 'Error desconocido');
-        setOrders([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOrders();
+    loadOrders();
   }, []);
 
-  const markAsSent = async (orderId) => {
+  const handleMarkAsSent = async (orderId) => {
     if (!window.confirm('Marcar pedido como enviado?')) return;
 
-    const { error } = await supabase
-      .from('orders')
-      .update({ status: 'sent' })
-      .eq('id', orderId);
-
-    if (error) return alert('Error al actualizar el pedido');
-
-    setOrders(orders.map(o => o.id === orderId ? { ...o, status: 'sent' } : o));
+    try {
+      await markOrderAsSent(orderId);
+      setOrders(orders.map(o => o.id === orderId ? { ...o, status: 'sent' } : o));
+    } catch (err) {
+      alert('Error al actualizar el pedido');
+    }
   };
 
-  const cancelOrder = async (orderId) => {
+  const handleCancel = async (orderId) => {
     if (!window.confirm('Cancelar pedido?')) return;
 
-    const { error } = await supabase
-      .from('orders')
-      .update({ status: 'canceled' })
-      .eq('id', orderId);
-
-    if (error) return alert('Error al cancelar el pedido');
-
-    setOrders(orders.map(o => o.id === orderId ? { ...o, status: 'canceled' } : o));
+    try {
+      await cancelOrder(orderId);
+      setOrders(orders.map(o => o.id === orderId ? { ...o, status: 'canceled' } : o));
+    } catch (err) {
+      alert('Error al cancelar el pedido');
+    }
   };
 
-  const deleteOrder = async (orderId) => {
+  const handleDelete = async (orderId) => {
     if (!window.confirm('¿Eliminar este pedido permanentemente?')) return;
 
-    const { error } = await supabase
-      .from('orders')
-      .delete()
-      .eq('id', orderId);
-
-    if (error) return alert('Error al eliminar el pedido');
-
-    setOrders(orders.filter(o => o.id !== orderId));
+    try {
+      await deleteOrder(orderId);
+      setOrders(orders.filter(o => o.id !== orderId));
+    } catch (err) {
+      alert('Error al eliminar el pedido');
+    }
   };
 
   if (loading) return <p className="p-10">Cargando pedidos...</p>;
@@ -98,13 +92,13 @@ export default function AdminOrders() {
                 {order.status === 'pending' && (
                   <>
                     <button
-                      onClick={() => markAsSent(order.id)}
+                      onClick={() => handleMarkAsSent(order.id)}
                       className="bg-green-600 text-yellow-300 px-3 py-1 rounded hover:bg-green-700"
                     >
                       Enviar
                     </button>
                     <button
-                      onClick={() => cancelOrder(order.id)}
+                      onClick={() => handleCancel(order.id)}
                       className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
                     >
                       Cancelar
@@ -113,7 +107,7 @@ export default function AdminOrders() {
                 )}
                 {(order.status === 'sent' || order.status === 'canceled') && (
                   <button
-                    onClick={() => deleteOrder(order.id)}
+                    onClick={() => handleDelete(order.id)}
                     className="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600"
                   >
                     Eliminar
@@ -127,3 +121,4 @@ export default function AdminOrders() {
     </div>
   );
 }
+

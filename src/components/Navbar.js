@@ -1,7 +1,7 @@
-// File: src/Navbar.js
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import CartPanel from './CartPanel';
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import CartPanel from "./CartPanel";
+import { getCartCount } from "../adapters/services/cartService";
 
 export default function Navbar({ cart, setCart, showCart, setShowCart }) {
   const [pop, setPop] = useState(false);
@@ -14,7 +14,8 @@ export default function Navbar({ cart, setCart, showCart, setShowCart }) {
     }
   }, [cart]);
 
-  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  // 👉 Use the adapter instead of reduce
+  const totalItems = getCartCount(cart);
 
   return (
     <>
@@ -26,20 +27,28 @@ export default function Navbar({ cart, setCart, showCart, setShowCart }) {
 
         {/* Navigation links */}
         <div className="space-x-4 flex items-center">
-          <Link to="/" className="hover:underline font-semibold tracking-wide">Inicio</Link>
-          <Link to="/productos" className="hover:underline font-semibold tracking-wide">Productos</Link>
-          <Link to="/admin" className="hover:underline font-semibold tracking-wide">Admin</Link>
-          <Link to="/contactanos" className="hover:underline font-semibold tracking-wide">Contáctanos</Link>
+          <Link to="/" className="hover:underline font-semibold tracking-wide">
+            Inicio
+          </Link>
+          <Link to="/productos" className="hover:underline font-semibold tracking-wide">
+            Productos
+          </Link>
+          <Link to="/admin" className="hover:underline font-semibold tracking-wide">
+            Admin
+          </Link>
+          <Link to="/contactanos" className="hover:underline font-semibold tracking-wide">
+            Contáctanos
+          </Link>
 
           {/* Cart icon */}
-          <div 
-            onClick={() => setShowCart(!showCart)} 
+          <div
+            onClick={() => setShowCart(!showCart)}
             className="relative cursor-pointer px-2 py-1 rounded"
             aria-label="Carrito de compras"
           >
-            <span 
-              className={`text-yellow-300 ${pop ? 'cart-pop' : ''}`}
-              style={{ fontSize: '2rem', fontFamily: 'Arial Black, sans-serif' }}
+            <span
+              className={`text-yellow-300 ${pop ? "cart-pop" : ""}`}
+              style={{ fontSize: "2rem", fontFamily: "Arial Black, sans-serif" }}
             >
               🛒
             </span>
@@ -52,19 +61,24 @@ export default function Navbar({ cart, setCart, showCart, setShowCart }) {
         </div>
       </nav>
 
-      <CartPanel cart={cart} setCart={setCart} showCart={showCart} setShowCart={setShowCart} />
+      <CartPanel
+        cart={cart}
+        setCart={setCart}
+        showCart={showCart}
+        setShowCart={setShowCart}
+      />
 
       {/* Cart pop animation */}
       <style>
         {`
-          .cart-pop {
-            animation: pop 0.3s ease;
-          }
-          @keyframes pop {
-            0% { transform: scale(1); }
-            50% { transform: scale(2); }
-            100% { transform: scale(1); }
-          }
+        .cart-pop {
+          animation: pop 0.3s ease;
+        }
+        @keyframes pop {
+          0% { transform: scale(1); }
+          50% { transform: scale(2); }
+          100% { transform: scale(1); }
+        }
         `}
       </style>
     </>

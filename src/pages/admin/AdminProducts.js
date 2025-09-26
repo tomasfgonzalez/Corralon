@@ -1,5 +1,13 @@
+// File: src/pages/admin/AdminProducts.js
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../supabaseClient';
+import {
+  fetchProducts,
+  addProduct,
+  updateProduct,
+  deleteProductById,
+  toggleFavorite,
+  applyDiscount
+} from '../../usecases/productUseCases';
 
 export default function AdminProducts({ setLogged }) {
   const [products, setProducts] = useState([]);
@@ -17,68 +25,49 @@ export default function AdminProducts({ setLogged }) {
   const [editingId, setEditingId] = useState(null);
   const [filter, setFilter] = useState('');
 
-  // Fetch products
-  useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      const { data, error } = await supabase.from('products').select('*').order('id', { ascending: true });
-      if (error) {
-        console.error('Error fetching products:', error);
-      } else {
-        // Filter out null/undefined rows
-        setProducts(data.filter(p => p));
-      }
+  // Cargar productos
+  const loadProducts = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchProducts();
+      setProducts(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
       setLoading(false);
-    };
-    fetchProducts();
+    }
+  };
+
+  useEffect(() => {
+    loadProducts();
   }, []);
 
-  const addOrUpdateProduct = async () => {
+  // Agregar o actualizar
+  const handleAddOrUpdate = async () => {
     if (!newProduct.name || !newProduct.price || !newProduct.category) {
       alert('Completa todos los campos');
       return;
     }
 
-    let imgUrl = newProduct.image;
     try {
-      const url = new URL(imgUrl);
-      url.searchParams.set('w', '128');
-      url.searchParams.set('h', '128');
-      imgUrl = url.toString();
-    } catch (e) {}
-
-    if (editingId) {
-      // Update
-      const { data, error } = await supabase
-        .from('products')
-        .update({ ...newProduct, price: parseFloat(newProduct.price), image: imgUrl })
-        .eq('id', editingId)
-        .select();
-      if (error || !data || !data[0]) {
-        alert('Error al actualizar producto');
-        console.error(error);
-      } else {
-        setProducts(products.map(p => (p && p.id === editingId ? data[0] : p)));
+      let updatedProduct;
+      if (editingId) {
+        updatedProduct = await updateProduct(editingId, newProduct);
+        setProducts(products.map(p => (p.id === editingId ? updatedProduct : p)));
         setEditingId(null);
-      }
-    } else {
-      // Insert
-      const { data, error } = await supabase
-        .from('products')
-        .insert([{ ...newProduct, price: parseFloat(newProduct.price), image: imgUrl }])
-        .select();
-      if (error || !data || !data[0]) {
-        alert('Error al agregar producto');
-        console.error(error);
       } else {
-        setProducts([...products, data[0]]);
+        updatedProduct = await addProduct(newProduct);
+        setProducts([...products, updatedProduct]);
       }
+      setNewProduct({ name: '', price: '', category: '', image: '', favorite: false, discount: 0 });
+    } catch (err) {
+      alert('Error al guardar producto');
+      console.error(err);
     }
-
-    setNewProduct({ name: '', price: '', category: '', image: '', favorite: false, discount: 0 });
   };
 
-  const editProduct = (p) => {
+  // Editar
+  const handleEdit = (p) => {
     if (!p) return;
     setNewProduct({
       name: p.name,
@@ -92,40 +81,44 @@ export default function AdminProducts({ setLogged }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const deleteProduct = async (id) => {
+  // Eliminar
+  const handleDelete = async (id) => {
     if (!window.confirm('¿Eliminar producto?')) return;
-    const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) {
+    try {
+      await deleteProductById(id);
+      setProducts(products.filter(p => p.id !== id));
+    } catch (err) {
       alert('Error al eliminar producto');
-      console.error(error);
-    } else {
-      setProducts(products.filter(p => p && p.id !== id));
+      console.error(err);
     }
   };
 
-  const toggleFavorite = async (id) => {
-    const product = products.find(p => p && p.id === id);
-    if (!product) return;
-    const { data, error } = await supabase.from('products').update({ favorite: !product.favorite }).eq('id', id).select();
-    if (!error && data && data[0]) {
-      setProducts(products.map(p => (p && p.id === id ? data[0] : p)));
+  // Marcar/desmarcar favorito
+  const handleToggleFavorite = async (id) => {
+    try {
+      const updated = await toggleFavorite(id);
+      setProducts(products.map(p => (p.id === id ? updated : p)));
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  const applyDiscount = async (id) => {
-    const percent = prompt('Ingrese el porcentaje de descuento (ej: 20, 0 para quitar):');
-    const discount = parseFloat(percent);
-    if (!isNaN(discount) && discount >= 0 && discount < 100) {
-      const { data, error } = await supabase.from('products').update({ discount }).eq('id', id).select();
-      if (!error && data && data[0]) {
-        setProducts(products.map(p => (p && p.id === id ? data[0] : p)));
-      }
-    } else {
-      alert('Porcentaje inválido');
+  // Aplicar descuento
+  const handleApplyDiscount = async (id) => {
+    const percent = parseFloat(prompt('Ingrese el porcentaje de descuento (ej: 20, 0 para quitar):'));
+    if (isNaN(percent) || percent < 0 || percent >= 100) return alert('Porcentaje inválido');
+
+    try {
+      const updated = await applyDiscount(id, percent);
+      setProducts(products.map(p => (p.id === id ? updated : p)));
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  const filteredProducts = products.filter(p => p && (!filter || p.name.toLowerCase().includes(filter.toLowerCase()) || p.category.toLowerCase().includes(filter.toLowerCase())));
+  const filteredProducts = products.filter(p =>
+    !filter || p.name.toLowerCase().includes(filter.toLowerCase()) || p.category.toLowerCase().includes(filter.toLowerCase())
+  );
 
   if (loading) return <p className="p-10 text-center">Cargando productos...</p>;
 
@@ -144,7 +137,7 @@ export default function AdminProducts({ setLogged }) {
             Marcar como favorito
           </label>
           <div className="flex gap-2">
-            <button onClick={addOrUpdateProduct} className="bg-brandGreen text-brandYellow py-2 rounded hover:bg-green-700 transition">{editingId ? 'Actualizar Producto' : 'Agregar Producto'}</button>
+            <button onClick={handleAddOrUpdate} className="bg-brandGreen text-brandYellow py-2 rounded hover:bg-green-700 transition">{editingId ? 'Actualizar Producto' : 'Agregar Producto'}</button>
             {editingId && <button onClick={() => { setEditingId(null); setNewProduct({ name: '', price: '', category: '', image: '', favorite: false, discount: 0 }); }} className="bg-gray-300 text-black py-2 rounded hover:bg-gray-200 transition">Cancelar</button>}
           </div>
         </div>
@@ -175,10 +168,10 @@ export default function AdminProducts({ setLogged }) {
                   </div>
                 </div>
                 <div className="space-x-2">
-                  <button onClick={() => editProduct(p)} className="bg-yellow-400 text-green-800 px-2 py-1 rounded hover:bg-yellow-300">Editar</button>
-                  <button onClick={() => deleteProduct(p.id)} className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">Eliminar</button>
-                  <button onClick={() => toggleFavorite(p.id)} className={`px-2 py-1 rounded ${p.favorite ? 'bg-green-500 text-yellow-300' : 'bg-gray-300 text-black'}`}>{p.favorite ? 'Favorito' : 'Marcar Favorito'}</button>
-                  <button onClick={() => applyDiscount(p.id)} className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">Aplicar Descuento</button>
+                  <button onClick={() => handleEdit(p)} className="bg-yellow-400 text-green-800 px-2 py-1 rounded hover:bg-yellow-300">Editar</button>
+                  <button onClick={() => handleDelete(p.id)} className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">Eliminar</button>
+                  <button onClick={() => handleToggleFavorite(p.id)} className={`px-2 py-1 rounded ${p.favorite ? 'bg-green-500 text-yellow-300' : 'bg-gray-300 text-black'}`}>{p.favorite ? 'Favorito' : 'Marcar Favorito'}</button>
+                  <button onClick={() => handleApplyDiscount(p.id)} className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">Aplicar Descuento</button>
                 </div>
               </li>
             ))}
@@ -190,3 +183,4 @@ export default function AdminProducts({ setLogged }) {
     </div>
   );
 }
+

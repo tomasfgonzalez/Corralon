@@ -1,37 +1,46 @@
-// File: src/pages/AdminTickets.js
+// File: src/pages/admin/AdminTickets.js
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../../supabaseClient';
+import { fetchTickets, deleteTicketById } from '../../usecases/ticketUseCases';
 
 export default function AdminTickets() {
   const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Load tickets
+  const loadTickets = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchTickets();
+      setTickets(data || []);
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Error al cargar tickets');
+      setTickets([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchTickets = async () => {
-      const { data, error } = await supabase
-        .from('tickets')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (!error) setTickets(data);
-      else console.error('Error fetching tickets:', error);
-    };
-
-    fetchTickets();
+    loadTickets();
   }, []);
 
-  // Delete ticket
-  const deleteTicket = async (ticketId) => {
+  // Delete a ticket
+  const handleDelete = async (ticketId) => {
     if (!window.confirm('¿Eliminar este ticket permanentemente?')) return;
 
-    const { error } = await supabase
-      .from('tickets')
-      .delete()
-      .eq('id', ticketId);
-
-    if (error) return alert('Error al eliminar el ticket');
-
-    setTickets(tickets.filter(t => t.id !== ticketId));
+    try {
+      await deleteTicketById(ticketId);
+      setTickets(tickets.filter(t => t.id !== ticketId));
+    } catch (err) {
+      console.error(err);
+      alert('Error al eliminar el ticket');
+    }
   };
+
+  if (loading) return <p className="p-6">Cargando tickets...</p>;
+  if (errorMsg) return <p className="p-6 text-red-600">{errorMsg}</p>;
 
   return (
     <div className="p-6">
@@ -45,12 +54,10 @@ export default function AdminTickets() {
               <p><strong>Email:</strong> {t.email}</p>
               <p><strong>Mensaje:</strong> {t.message}</p>
               {t.status && <p><strong>Estado:</strong> {t.status}</p>}
-              <p className="text-sm text-gray-500">
-                {new Date(t.created_at).toLocaleString()}
-              </p>
+              <p className="text-sm text-gray-500">{new Date(t.created_at).toLocaleString()}</p>
               <div className="flex gap-2 mt-2">
                 <button
-                  onClick={() => deleteTicket(t.id)}
+                  onClick={() => handleDelete(t.id)}
                   className="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600"
                 >
                   Eliminar

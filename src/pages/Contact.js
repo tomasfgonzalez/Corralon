@@ -1,10 +1,9 @@
-// File: src/pages/Contactanos.js
-import React, { useState } from 'react';
-import { supabase } from '../supabaseClient';
+import React, { useState } from "react";
+import { createTicket } from "../usecases/createTicket";
 
 export default function Contactanos() {
-  const [email, setEmail] = useState('');
-  const [message, setMessage] = useState('');
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(null);
 
@@ -13,17 +12,12 @@ export default function Contactanos() {
     setLoading(true);
     setSuccess(null);
 
-    const { error } = await supabase
-      .from('tickets')
-      .insert([{ email, message }]);
+    const result = await createTicket({ email, message });
+    setSuccess(result.success);
 
-    if (error) {
-      console.error(error);
-      setSuccess(false);
-    } else {
-      setSuccess(true);
-      setEmail('');
-      setMessage('');
+    if (result.success) {
+      setEmail("");
+      setMessage("");
     }
     setLoading(false);
   };
@@ -55,15 +49,19 @@ export default function Contactanos() {
           disabled={loading}
           className="bg-brandGreen text-brandYellow py-2 rounded hover:bg-green-700 transition"
         >
-          {loading ? 'Enviando...' : 'Enviar'}
+          {loading ? "Enviando..." : "Enviar"}
         </button>
       </form>
 
       {success === true && (
-        <p className="mt-4 text-green-600">✅ Tu mensaje fue enviado correctamente.</p>
+        <p className="mt-4 text-green-600">
+          ✅ Tu mensaje fue enviado correctamente.
+        </p>
       )}
       {success === false && (
-        <p className="mt-4 text-red-600">❌ Hubo un error al enviar el mensaje. Intenta nuevamente.</p>
+        <p className="mt-4 text-red-600">
+          ❌ Hubo un error al enviar el mensaje. Intenta nuevamente.
+        </p>
       )}
     </div>
   );
